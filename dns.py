@@ -2,6 +2,7 @@ import socket
 import binascii
 from note import Note, get_current_time
 import pickle
+from threading import Thread
 
 
 E1_DNS = '195.19.220.238'
@@ -11,6 +12,8 @@ cache_filename = 'cache.txt'
 previous_cleaning = get_current_time()
 
 check_time = 100
+
+cache[('aaaa', '0001')] = [Note('0001', 60, 'dsadkokasod')]  # test cache
 
 
 def extract_name_from_request(question, index=0):
@@ -22,7 +25,6 @@ def extract_name_from_request(question, index=0):
             break
         if count == part_len:
             part_len = int(question[i:i + 2], 16)
-            print(part_len)
             count = 0
             Q_NAME += '.'
         else:
@@ -33,7 +35,6 @@ def extract_name_from_request(question, index=0):
 
 
 def parse_request(request):
-    print(request, len(request))
     HEADER = request[:24]
     ID = HEADER[:4]
     QUESTIONS_COUNT = HEADER[8:12]
@@ -61,7 +62,6 @@ def parse_request(request):
 
 
 def parse_response(response):
-    print(response)
     HEADER = response[0:24]
     QUESTION = response[24:]
     ANSWERS_COUNT = int(HEADER[12:16], 16)
@@ -121,7 +121,6 @@ def extract_name_from_response(question, index=24):
             break
         if count == part_len:
             part_len = int(question[i:i + 2], 16)
-            print(part_len)
             count = 0
             name += '.'
         else:
@@ -140,21 +139,24 @@ def send_message(message, ip, port):
 
 def clean_cache():
     global previous_cleaning
-    curr_time = get_current_time()
-    if curr_time - previous_cleaning > check_time:
-        notes_to_delete = []
-        for k, v in cache.items():
-            for item in v:
-                if item.expiration_time <= curr_time:
-                    del item
-            if len(v) == 0:
-                notes_to_delete.append(k)
-        for note in notes_to_delete:
-            del cache[note]
-        previous_cleaning = get_current_time()
+    while True:
+        curr_time = get_current_time()
+        if curr_time - previous_cleaning > check_time:
+            notes_to_delete = []
+            for k, v in cache.items():
+                for item in v:
+                    if item.expiration_time <= curr_time:
+                        del item
+                        print("TIME IS UP")
+                if len(v) == 0:
+                    notes_to_delete.append(k)
+                print("CLEAN")
+            for note in notes_to_delete:
+                del cache[note]
+            previous_cleaning = get_current_time()
 
-    with open(cache_filename, 'wb+') as file:
-        pickle.dump(cache, file)
+            with open(cache_filename, 'wb+') as file:
+                pickle.dump(cache, file)
 
 
 def main():
@@ -179,4 +181,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        Thread(target=clean_cache).start()
+        Thread(target=main).start()
+    except KeyboardInterrupt:
+        with open(cache_filename, 'wb+') as file:
+            pickle.dump(cache, file)
