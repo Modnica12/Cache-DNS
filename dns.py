@@ -11,7 +11,7 @@ cache_filename = 'cache.txt'
 
 previous_cleaning = get_current_time()
 
-check_time = 10
+check_time = 5
 
 #cache[('e1.ru', '0001')] = [Note('0001', 30, '000404dd')]  # test cache
 
@@ -20,7 +20,6 @@ def extract_name_from_request(question, index=0):
     Q_NAME = ''
     part_len = int(question[index:2], 16)
     count = 0
-    print('quest', question)
     for i in range(2, len(question[:-8]), 2):
         if int(question[i:i + 2], 16) == 0:
             break
@@ -47,8 +46,6 @@ def parse_request(request):
     Q_NAME = extract_name_from_request(QUESTION)
     Q_TYPE = QUESTION[-8:-4]
 
-    print(Q_NAME, Q_TYPE)
-    print(cache)
     if (Q_NAME, Q_TYPE) in cache:
         print('Using cache...')
         res = []
@@ -150,14 +147,15 @@ def clean_cache():
         if curr_time - previous_cleaning > check_time:
             notes_to_delete = []
             for k, v in cache.items():
-                for item in v:
-                    if item.expiration_time <= curr_time:
-                        del item
+                for i in range(len(v)):
+                    if v[i].expiration_time <= curr_time:
+                        del cache[k][i]
                         print("TIME IS UP")
                 if len(v) == 0:
                     notes_to_delete.append(k)
-                print("CLEAN")
+                print("CLEANING...")
             for note in notes_to_delete:
+                print('note', note)
                 del cache[note]
             previous_cleaning = get_current_time()
 
@@ -166,6 +164,7 @@ def clean_cache():
 
 
 def main():
+    global cache
     IP = '127.0.0.1'
     PORT = 53
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -175,16 +174,17 @@ def main():
     try:
         with open(cache_filename, 'rb') as file:
             cache = pickle.load(file)
-    except:
+    except Exception:
         pass
 
     while True:
-        data, addr = sock.recvfrom(2048)
-        print(addr)
-        data = binascii.hexlify(data).decode('UTF-8')
-        response = parse_request(data)
-        print('resp ', response)
-        sock.sendto(binascii.unhexlify(response), addr)
+        try:
+            data, addr = sock.recvfrom(2048)
+            data = binascii.hexlify(data).decode('UTF-8')
+            response = parse_request(data)
+            sock.sendto(binascii.unhexlify(response), addr)
+        except OSError:
+            pass
 
 
 if __name__ == '__main__':
