@@ -11,15 +11,16 @@ cache_filename = 'cache.txt'
 
 previous_cleaning = get_current_time()
 
-check_time = 100
+check_time = 10
 
-cache[('aaaa', '0001')] = [Note('0001', 60, 'dsadkokasod')]  # test cache
+#cache[('e1.ru', '0001')] = [Note('0001', 30, '000404dd')]  # test cache
 
 
 def extract_name_from_request(question, index=0):
     Q_NAME = ''
     part_len = int(question[index:2], 16)
     count = 0
+    print('quest', question)
     for i in range(2, len(question[:-8]), 2):
         if int(question[i:i + 2], 16) == 0:
             break
@@ -38,30 +39,34 @@ def parse_request(request):
     HEADER = request[:24]
     ID = HEADER[:4]
     QUESTIONS_COUNT = HEADER[8:12]
-    ANSWERS_COUNT = HEADER[12:16]
     NS_COUNT = HEADER[16:20]
     AR_COUNT = HEADER[20:24]
 
     QUESTION = request[24:]
 
     Q_NAME = extract_name_from_request(QUESTION)
-    Q_TYPE = int(QUESTION[-8:-4], 16)
+    Q_TYPE = QUESTION[-8:-4]
 
+    print(Q_NAME, Q_TYPE)
+    print(cache)
     if (Q_NAME, Q_TYPE) in cache:
+        print('Using cache...')
         res = []
         for note in cache[(Q_NAME, Q_TYPE)]:
-            data, is_valid = note.serialize()
+            is_valid, data = note.serialize()
             if is_valid:
                 res.append(data)
 
         if len(res) > 0:
-            header = ID + '8180' + QUESTIONS_COUNT + ANSWERS_COUNT + NS_COUNT + AR_COUNT
+            answers_count = hex(len(res))[2:].rjust(4, '0')
+            header = ID + '8180' + QUESTIONS_COUNT + answers_count + NS_COUNT + AR_COUNT
             return header + QUESTION + "".join(res)
 
     return parse_response(send_message(request, E1_DNS, 53))
 
 
 def parse_response(response):
+    #print('resp  ', response)
     HEADER = response[0:24]
     QUESTION = response[24:]
     ANSWERS_COUNT = int(HEADER[12:16], 16)
@@ -84,7 +89,8 @@ def parse_response(response):
         ans_name = ''
         ans_type = ''
         for i in range(count):
-            ans_name = extract_name_from_request(rest)
+            #ans_name = extract_name_from_request(rest)
+            #print('ans name', ans_name)
             ans_type = rest[4:8]
             ttl = int(rest[12:20], 16)
             ans_data_len = int(rest[20:24], 16) * 2
@@ -93,16 +99,16 @@ def parse_response(response):
             note = Note(ans_type, ttl, ans_data)
 
             rest = rest[24 + ans_data_len:]
-            if ans_name != previous_name:
-                cache[(ans_name, ans_type)] = [note]
+            if name != previous_name:
+                cache[(name, ans_type)] = [note]
                 answers = []
             else:
                 answers.append(note)
 
-            previous_name = ans_name
+            previous_name = name
 
         if len(answers) > 0:
-            cache[(ans_name, ans_type)] = answers
+            cache[(name, ans_type)] = answers
 
     with open(cache_filename, 'wb+') as file:
         pickle.dump(cache, file)
@@ -177,6 +183,7 @@ def main():
         print(addr)
         data = binascii.hexlify(data).decode('UTF-8')
         response = parse_request(data)
+        print('resp ', response)
         sock.sendto(binascii.unhexlify(response), addr)
 
 

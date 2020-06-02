@@ -13,8 +13,8 @@ class Note:
 
     def serialize(self):
         return self.expiration_time > get_current_time(), self.name + self.type + '0001' + \
-               hex(self.expiration_time - get_current_time()).rjust(8, '0')[:2] + \
-               hex(self.data_length)[:2].rjust(4, '0') + self.data
+               hex(self.expiration_time - get_current_time())[2:].rjust(8, '0') + \
+               hex(self.data_length)[2:].rjust(4, '0') + self.data
 
 
 def get_current_time():
